@@ -1,0 +1,78 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: flix
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_backups:/backups
+    networks:
+      - app-network
+
+  postgres-backup:
+    image: postgres:16
+    container_name: postgres-backup
+    depends_on:
+      - postgres
+    restart: always
+    environment:
+      PGPASSWORD: postgres
+    volumes:
+      - postgres_backups:/backups
+    networks:
+      - app-network
+    entrypoint: |
+      bash -c '
+      # Aguardar o PostgreSQL iniciar completamente
+      sleep 30
+      
+      # Função para rotação de backups (manter apenas os 7 mais recentes)
+      cleanup_old_backups() {
+        find /backups -name "*.sql" -type f | sort -r | tail -n +8 | xargs rm -f 2>/dev/null
+        echo "$(date): Backup cleanup completed"
+      }
+      
+      # Loop principal de backup
+      while true; do
+        # Criar o backup
+        BACKUP_FILE="/backups/flix_backup_$(date +%Y%m%d_%H%M%S).sql"
+        echo "$(date): Creating backup $BACKUP_FILE"
+        pg_dump -h postgres -U postgres -d flix -f $BACKUP_FILE
+      
+        # Verificar se o backup foi bem-sucedido
+        if [ $? -eq 0 ]; then
+          echo "$(date): Backup completed successfully"
+          # Executar limpeza de backups antigos
+          cleanup_old_backups
+        else
+          echo "$(date): Backup failed"
+        fi
+      
+        # Aguardar 24 horas (86400 segundos) até o próximo backup
+        echo "$(date): Next backup scheduled in 24 hours"
+        sleep 86400
+      done'
+
+volumes:
+  postgres_data:
+    driver: local
+  postgres_backups:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

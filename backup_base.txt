@@ -1,0 +1,18 @@
+# Para criar um backup completo
+docker exec postgres pg_dump -U postgres -d flix -f /backups/flix_backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Para criar um backup compactado
+docker exec postgres pg_dump -U postgres -d flix | gzip > /backups/flix_backup_$(date +%Y%m%d_%H%M%S).sql.gz
+
+# Para restaurar um backup
+docker exec -i postgres psql -U postgres -d flix < /path/to/backup.sql
+
+
+# Para criar um backup completo
+docker exec postgres pg_dump -U postgres -d flix -f /backups/flix_backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Para criar um backup compactado
+docker exec postgres pg_dump -U postgres -d flix | gzip > /backups/flix_backup_$(date +%Y%m%d_%H%M%S).sql.gz
+
+# Para restaurar um backup
+docker exec -i postgres psql -U postgres -d flix < /path/to/backup.sqlw
